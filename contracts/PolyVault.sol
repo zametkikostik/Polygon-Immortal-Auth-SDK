@@ -1,159 +1,338 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+// ============================================
+// IMPORTS (OpenZeppelin via URL for Remix)
+// ============================================
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v5.0.0/contracts/access/Ownable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v5.0.0/contracts/security/ReentrancyGuard.sol";
+
 /**
  * @title PolyVault
- * @dev Decentralized Identity & Access Management
- * Хранение ссылок на зашифрованные данные в IPFS
- * Сеть: Polygon (MATIC)
+ * @author Senior Blockchain Engineer
+ * @notice Secure vault storage with authenticator-gated access
+ * @dev Only Web3Authenticator contract can write data
+ * 
+ * Network: Polygon Mainnet (Chain ID: 137)
+ * 
+ * Architecture:
+ * - Web3Authenticator (owner) → writes to PolyVault
+ * - PolyVault → stores encrypted data
+ * - Users → read-only access to their own data
+ * 
+ * Security:
+ * - Only authenticator can call storeData
+ * - Users can only read their own data
+ * - Owner can change authenticator address
  */
-contract PolyVault {
+contract PolyVault is Ownable, ReentrancyGuard {
     
-    // Структура для хранения информации о записи
-    struct VaultRecord {
-        string ipfsHash;      // CID хэш данных в IPFS
-        uint256 createdAt;    // Время создания
-        uint256 updatedAt;    // Время последнего обновления
-        bool exists;          // Флаг существования записи
-    }
-    
-    // Mapping для хранения записей пользователей
-    mapping(address => VaultRecord) private userVaults;
-    
-    // История версий для каждого пользователя
-    mapping(address => string[]) private versionHistory;
-    
-    // События
-    event VaultCreated(address indexed user, string ipfsHash, uint256 timestamp);
-    event VaultUpdated(address indexed user, string ipfsHash, uint256 timestamp);
-    event VaultDeleted(address indexed user, uint256 timestamp);
-    event VersionAdded(address indexed user, string ipfsHash, uint256 timestamp);
+    // ============================================
+    // STATE VARIABLES
+    // ============================================
     
     /**
-     * @dev Создает новую запись с ссылкой на IPFS
-     * @param _ipfsHash CID хэш данных в IPFS
+     * @dev Хранилище зашифрованных данных пользователей
+     * @notice Доступ к записи только у Web3Authenticator
      */
-    function createVault(string memory _ipfsHash) public {
-        require(bytes(_ipfsHash).length > 0, "IPFS hash cannot be empty");
-        require(!userVaults[msg.sender].exists, "Vault already exists. Use updateVault instead.");
-        
-        userVaults[msg.sender] = VaultRecord({
-            ipfsHash: _ipfsHash,
-            createdAt: block.timestamp,
-            updatedAt: block.timestamp,
-            exists: true
-        });
-        
-        versionHistory[msg.sender].push(_ipfsHash);
-        
-        emit VaultCreated(msg.sender, _ipfsHash, block.timestamp);
-    }
+    mapping(address => string) private encryptedSecrets;
     
     /**
-     * @dev Обновляет существующую запись с новой ссылкой на IPFS
-     * @param _ipfsHash Новый CID хэш данных в IPFS
+     * @dev Адрес контракта-аутентификатора (Web3Authenticator)
+     * @notice Только этот адрес может вызывать storeData
      */
-    function updateVault(string memory _ipfsHash) public {
-        require(bytes(_ipfsHash).length > 0, "IPFS hash cannot be empty");
-        require(userVaults[msg.sender].exists, "Vault does not exist. Use createVault first.");
-        
-        userVaults[msg.sender].ipfsHash = _ipfsHash;
-        userVaults[msg.sender].updatedAt = block.timestamp;
-        
-        versionHistory[msg.sender].push(_ipfsHash);
-        
-        emit VaultUpdated(msg.sender, _ipfsHash, block.timestamp);
+    address public authenticator;
+    
+    /**
+     * @dev Статус активности хранилища
+     */
+    bool public vaultActive = true;
+    
+    /**
+     * @dev Общее количество записей
+     */
+    uint256 public totalRecords;
+    
+    // ============================================
+    // EVENTS
+    // ============================================
+    
+    /**
+     * @dev Событие записи данных
+     */
+    event DataStored(address indexed user, uint256 timestamp, string ipfsHash);
+    
+    /**
+     * @dev Событие обновления аутентификатора
+     */
+    event AuthenticatorUpdated(address oldAuth, address newAuth);
+    
+    /**
+     * @dev Событие чтения данных
+     */
+    event DataAccessed(address indexed user, address indexed accessor, uint256 timestamp);
+    
+    /**
+     * @dev Событие удаления данных
+     */
+    event DataDeleted(address indexed user, uint256 timestamp);
+    
+    /**
+     * @dev Событие активации/деактивации хранилища
+     */
+    event VaultStatusChanged(bool active);
+    
+    // ============================================
+    // ERRORS
+    // ============================================
+    
+    error InvalidAuthenticatorAddress();
+    error CallerNotAuthenticator();
+    error VaultNotActive();
+    error NoDataFound();
+    error UnauthorizedAccess();
+    
+    // ============================================
+    // MODIFIERS
+    // ============================================
+    
+    /**
+     * @dev Проверяет что вызывающий — контракт-аутентификатор
+     */
+    modifier onlyAuthenticator() {
+        if (msg.sender != authenticator) {
+            revert CallerNotAuthenticator();
+        }
+        _;
     }
     
     /**
-     * @dev Возвращает IPFS хэш пользователя (бесплатный view вызов)
+     * @dev Проверяет что хранилище активно
+     */
+    modifier vaultIsActive() {
+        if (!vaultActive) {
+            revert VaultNotActive();
+        }
+        _;
+    }
+    
+    // ============================================
+    // CONSTRUCTOR
+    // ============================================
+    
+    /**
+     * @dev Конструктор инициализирует владельца
+     * @notice Owner = деплоер контракта
+     */
+    constructor() Ownable(msg.sender) {
+        // Authenticator будет установлен через setAuthenticator
+    }
+    
+    // ============================================
+    // ADMIN FUNCTIONS (OWNER ONLY)
+    // ============================================
+    
+    /**
+     * @dev Установка адреса контракта-аутентификатора
+     * @param _auth Адрес Web3Authenticator контракта
+     * @notice Доступно только owner
+     */
+    function setAuthenticator(address _auth) external onlyOwner {
+        if (_auth == address(0)) {
+            revert InvalidAuthenticatorAddress();
+        }
+        
+        address oldAuth = authenticator;
+        authenticator = _auth;
+        
+        emit AuthenticatorUpdated(oldAuth, _auth);
+    }
+    
+    /**
+     * @dev Активация хранилища
+     */
+    function activateVault() external onlyOwner {
+        vaultActive = true;
+        emit VaultStatusChanged(true);
+    }
+    
+    /**
+     * @dev Деактивация хранилища (экстренная остановка)
+     */
+    function deactivateVault() external onlyOwner {
+        vaultActive = false;
+        emit VaultStatusChanged(false);
+    }
+    
+    /**
+     * @dev Принудительное удаление данных пользователя (admin)
+     * @param user Адрес пользователя
+     */
+    function adminDeleteData(address user) external onlyOwner {
+        delete encryptedSecrets[user];
+        emit DataDeleted(user, block.timestamp);
+    }
+    
+    // ============================================
+    // CORE FUNCTIONS
+    // ============================================
+    
+    /**
+     * @dev Сохранение зашифрованных данных
      * @param _user Адрес пользователя
-     * @return IPFS CID хэш
+     * @param _ipfsHash CID хэш зашифрованных данных в IPFS
+     * @notice Доступно только Web3Authenticator контракту
      */
-    function getVault(address _user) public view returns (string memory) {
-        require(userVaults[_user].exists, "Vault does not exist");
-        return userVaults[_user].ipfsHash;
+    function storeData(address _user, string calldata _ipfsHash) external onlyAuthenticator vaultIsActive {
+        if (bytes(_ipfsHash).length == 0) {
+            revert("Empty IPFS hash");
+        }
+        
+        encryptedSecrets[_user] = _ipfsHash;
+        totalRecords++;
+        
+        emit DataStored(_user, block.timestamp, _ipfsHash);
     }
     
     /**
-     * @dev Проверяет, есть ли данные у пользователя
+     * @dev Обновление существующих данных
+     * @param _user Адрес пользователя
+     * @param _ipfsHash Новый CID хэш
+     * @notice Доступно только Web3Authenticator контракту
+     */
+    function updateData(address _user, string calldata _ipfsHash) external onlyAuthenticator vaultIsActive {
+        if (bytes(encryptedSecrets[_user]).length == 0) {
+            revert NoDataFound();
+        }
+        
+        encryptedSecrets[_user] = _ipfsHash;
+        
+        emit DataStored(_user, block.timestamp, _ipfsHash);
+    }
+    
+    /**
+     * @dev Получение данных пользователем или аутентификатором
+     * @param _user Адрес пользователя
+     * @return IPFS CID хэш зашифрованных данных
+     * @notice Пользователь может читать только свои данные
+     */
+    function getData(address _user) external view returns (string memory) {
+        // Разрешаем чтение: owner, authenticator, или сам пользователь
+        if (msg.sender != owner() && msg.sender != authenticator && msg.sender != _user) {
+            revert UnauthorizedAccess();
+        }
+        
+        string memory data = encryptedSecrets[_user];
+        
+        if (bytes(data).length == 0) {
+            revert NoDataFound();
+        }
+        
+        emit DataAccessed(_user, msg.sender, block.timestamp);
+        
+        return data;
+    }
+    
+    /**
+     * @dev Проверка наличия данных у пользователя
      * @param _user Адрес пользователя
      * @return true если данные существуют
      */
-    function hasVault(address _user) public view returns (bool) {
-        return userVaults[_user].exists;
+    function hasData(address _user) external view returns (bool) {
+        return bytes(encryptedSecrets[_user]).length > 0;
     }
     
     /**
-     * @dev Возвращает информацию о vault пользователя
-     * @param _user Адрес пользователя
-     * @return ipfsHash, createdAt, updatedAt, exists
+     * @dev Удаление данных пользователем
+     * @notice Пользователь может удалить только свои данные
      */
-    function getVaultInfo(address _user) public view returns (
-        string memory ipfsHash,
-        uint256 createdAt,
-        uint256 updatedAt,
-        bool exists
+    function deleteData() external vaultIsActive {
+        address user = msg.sender;
+        
+        if (bytes(encryptedSecrets[user]).length == 0) {
+            revert NoDataFound();
+        }
+        
+        delete encryptedSecrets[user];
+        
+        emit DataDeleted(user, block.timestamp);
+    }
+    
+    // ============================================
+    // VIEW FUNCTIONS
+    // ============================================
+    
+    /**
+     * @dev Получение информации о хранилище
+     * @return total, active, authenticator, owner
+     */
+    function getVaultInfo() external view returns (
+        uint256 total,
+        bool active,
+        address auth,
+        address own
     ) {
-        VaultRecord storage record = userVaults[_user];
-        return (record.ipfsHash, record.createdAt, record.updatedAt, record.exists);
+        return (totalRecords, vaultActive, authenticator, owner());
     }
     
     /**
-     * @dev Возвращает количество версий у пользователя
-     * @param _user Адрес пользователя
-     * @return Количество версий
+     * @dev Проверка является ли адрес авторизованным для записи
      */
-    function getVersionCount(address _user) public view returns (uint256) {
-        return versionHistory[_user].length;
+    function isAuthorizedWriter(address addr) external view returns (bool) {
+        return addr == authenticator;
     }
     
     /**
-     * @dev Возвращает версию по индексу
-     * @param _user Адрес пользователя
-     * @param _index Индекс версии
-     * @return IPFS CID хэш версии
+     * @dev Получение количества записей для конкретного пользователя
+     * @notice Всегда 1 или 0 (последняя запись перезаписывает предыдущую)
      */
-    function getVersion(address _user, uint256 _index) public view returns (string memory) {
-        require(_index < versionHistory[_user].length, "Index out of bounds");
-        return versionHistory[_user][_index];
+    function getUserRecordCount(address user) external view returns (uint256) {
+        return hasData(user) ? 1 : 0;
+    }
+    
+    // ============================================
+    // EMERGENCY FUNCTIONS
+    // ============================================
+    
+    /**
+     * @dev Экстренная пауза всех операций записи
+     * @notice Только owner
+     */
+    function emergencyStop() external onlyOwner {
+        vaultActive = false;
+        emit VaultStatusChanged(false);
     }
     
     /**
-     * @dev Возвращает последние N версий
-     * @param _user Адрес пользователя
-     * @param _count Количество версий для возврата
-     * @return Массив IPFS хэшей
+     * @dev Проверка статуса экстренной остановки
      */
-    function getRecentVersions(address _user, uint256 _count) public view returns (string[] memory) {
-        uint256 total = versionHistory[_user].length;
-        if (_count > total) {
-            _count = total;
-        }
-        
-        string[] memory recent = new string[](_count);
-        for (uint256 i = 0; i < _count; i++) {
-            recent[i] = versionHistory[_user][total - _count + i];
-        }
-        
-        return recent;
+    function isEmergencyStop() external view returns (bool) {
+        return !vaultActive;
+    }
+    
+    // ============================================
+    // METADATA FUNCTIONS
+    // ============================================
+    
+    /**
+     * @dev Получение последнего времени записи для пользователя
+     */
+    function getLastWriteTime(address user) external view returns (uint256) {
+        // Для этого нужно добавить отдельный маппинг
+        // Упрощённая версия возвращает 0
+        return 0;
     }
     
     /**
-     * @dev Удаляет vault пользователя (опционально)
+     * @dev Статистика хранилища
      */
-    function deleteVault() public {
-        require(userVaults[msg.sender].exists, "Vault does not exist");
-        delete userVaults[msg.sender];
-        emit VaultDeleted(msg.sender, block.timestamp);
-    }
-    
-    /**
-     * @dev Возвращает все версии истории
-     * @param _user Адрес пользователя
-     * @return Массив всех IPFS хэшей
-     */
-    function getAllVersions(address _user) public view returns (string[] memory) {
-        return versionHistory[_user];
+    function getStats() external view returns (
+        uint256 total,
+        bool active,
+        address auth,
+        address own,
+        uint256 balance
+    ) {
+        return (totalRecords, vaultActive, authenticator, owner(), address(this).balance);
     }
 }
