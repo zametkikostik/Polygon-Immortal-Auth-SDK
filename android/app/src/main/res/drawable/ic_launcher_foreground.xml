@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Внешний щит -->
+    <path
+        android:fillColor="#7c3aed"
+        android:pathData="M54,18 L82,28 L82,56 C82,78 69,96 54,102 C39,96 26,78 26,56 L26,28 Z"/>
+    
+    <!-- Внутренний щит -->
+    <path
+        android:fillColor="#1a1a2e"
+        android:pathData="M54,24 L74,32 L74,56 C74,73 65,88 54,94 C43,88 34,73 34,56 L34,32 Z"/>
+    
+    <!-- Замок в центре -->
+    <path
+        android:fillColor="#10b981"
+        android:pathData="M54,42 C48,42 43,47 43,53 L43,62 L40,62 L40,74 L68,74 L68,62 L65,62 L65,53 C65,47 60,42 54,42 Z M54,48 C56.8,48 59,50.2 59,53 L59,62 L49,62 L49,53 C49,50.2 51.2,48 54,48 Z"/>
+    
+    <!-- Блеск сверху -->
+    <path
+        android:fillColor="#a78bfa"
+        android:pathData="M54,34 L56,39 L61,39 L57,42 L59,47 L54,44 L49,47 L51,42 L47,39 L52,39 Z"/>
+    
+    <!-- IPFS узлы (круги через path) -->
+    <path
+        android:fillColor="#60a5fa"
+        android:pathData="M42,50 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:pathData="M66,50 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+    <path
+        android:fillColor="#60a5fa"
+        android:pathData="M54,68 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+</vector>

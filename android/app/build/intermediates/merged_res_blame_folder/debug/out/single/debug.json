@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-merged_res-32:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-main-34:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-merged_res-32:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-main-34:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-merged_res-32:/xml_network_security_config.xml.flat",
+        "source": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-main-34:/xml/network_security_config.xml"
+    },
+    {
+        "merged": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-merged_res-32:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "/home/kostik/.gradle/daemon/8.2/com.polyvault.app-main-34:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.polyvault.app-merged_res-32:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.polyvault.app-main-34:/drawable/ic_launcher_foreground.xml"
+    }
+]

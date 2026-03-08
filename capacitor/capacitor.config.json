@@ -1,0 +1,32 @@
+{
+  "appId": "com.immortalweb3fa.app",
+  "appName": "Immortal Web3 2FA",
+  "webDir": "www",
+  "bundledWebRuntime": true,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#000000"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    },
+    "App": {
+      "backgroundColor": "#000000"
+    }
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystorePassword": null,
+      "keystoreAlias": null,
+      "keystoreAliasPassword": null,
+      "releaseType": "APK"
+    },
+    "webContentsDebuggingEnabled": true
+  }
+}
