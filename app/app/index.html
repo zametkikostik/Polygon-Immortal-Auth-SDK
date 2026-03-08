@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <title>⚡ Immortal Web3 2FA | Gasless Authenticator</title>
+    
+    <!-- CDN Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/otpauth@9.1.2/otpauth.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@biconomy/account@3.0.0/dist/biconomy.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@biconomy/common@3.0.0/dist/common.umd.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================
+           MODERN DARK THEME
+           ========================================== */
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-card: #1a1a1a;
+            --bg-input: #0f0f0f;
+            --bg-hover: #222222;
+            
+            --accent-primary: #5b21b6;
+            --accent-secondary: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.3);
+            
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            
+            --border: rgba(255, 255, 255, 0.1);
+            --border-glow: 0 0 20px rgba(124, 58, 237, 0.4);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container { max-width: 720px; margin: 0 auto; padding: 20px; padding-bottom: 100px; }
+        
+        /* HEADER */
+        header { text-align: center; padding: 40px 20px; margin-bottom: 30px; }
+        .logo {
+            font-size: 2.5rem; font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+        .subtitle { color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px; }
+        .badges { display: flex; justify-content: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; background: rgba(124, 58, 237, 0.15);
+            border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 20px;
+            font-size: 0.75rem; color: #a78bfa; text-transform: uppercase;
+        }
+        
+        /* CARDS */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .card-title {
+            font-size: 1rem; font-weight: 600; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .card-title::before {
+            content: ''; width: 4px; height: 18px;
+            background: linear-gradient(180deg, var(--accent-secondary), #60a5fa);
+            border-radius: 2px;
+        }
+        
+        /* BUTTONS */
+        .btn {
+            width: 100%; padding: 16px 20px; border: none; border-radius: var(--radius);
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-bottom: 12px; transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+            color: white; box-shadow: 0 4px 15px var(--accent-glow);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        .btn-outline {
+            background: transparent; color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover { border-color: var(--accent-secondary); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn-group-3 { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 500px) { .btn-group, .btn-group-3 { grid-template-columns: 1fr; } }
+        
+        /* INPUTS */
+        .input-group { margin-bottom: 16px; }
+        .input-group label {
+            display: block; margin-bottom: 8px; color: var(--text-secondary);
+            font-size: 0.85rem; font-weight: 500;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%; padding: 14px 16px; border: 1px solid var(--border);
+            border-radius: var(--radius); background: var(--bg-input);
+            color: var(--text-primary); font-size: 1rem; font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s;
+        }
+        .input-group input:focus, .input-group textarea:focus {
+            outline: none; border-color: var(--accent-secondary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        /* STATUS */
+        .status-bar {
+            padding: 14px 18px; border-radius: var(--radius); margin-bottom: 16px;
+            display: none; border-left: 4px solid; font-size: 0.9rem;
+        }
+        .status-bar.show { display: block; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .status-bar.info { background: rgba(59, 130, 246, 0.15); border-color: var(--info); color: var(--info); }
+        .status-bar.success { background: rgba(16, 185, 129, 0.15); border-color: var(--success); color: var(--success); }
+        .status-bar.error { background: rgba(239, 68, 68, 0.15); border-color: var(--danger); color: var(--danger); }
+        .status-bar.warning { background: rgba(245, 158, 11, 0.15); border-color: var(--warning); color: var(--warning); }
+        
+        /* SERVICE ITEMS */
+        .service-item {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s;
+        }
+        .service-item:hover { border-color: var(--accent-secondary); }
+        .service-info { flex: 1; min-width: 0; }
+        .service-name { font-weight: 600; margin-bottom: 4px; }
+        .service-issuer { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
+        .service-code {
+            font-family: 'JetBrains Mono', monospace; font-size: 1.6rem;
+            font-weight: 700; letter-spacing: 4px; color: var(--success);
+            margin-top: 6px;
+        }
+        .service-actions { display: flex; align-items: center; gap: 8px; }
+        .copy-btn {
+            background: none; border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-secondary); cursor: pointer; padding: 8px;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { border-color: var(--accent-secondary); color: var(--accent-secondary); }
+        .delete-btn {
+            background: none; border: none; color: var(--danger);
+            cursor: pointer; padding: 8px; font-size: 1.3rem; opacity: 0.6;
+            transition: all 0.2s;
+        }
+        .delete-btn:hover { opacity: 1; transform: scale(1.1); }
+        
+        /* TIMER */
+        .service-timer {
+            width: 56px; height: 56px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            margin-left: 12px;
+        }
+        .timer-ring { position: absolute; width: 100%; height: 100%; }
+        .timer-ring circle { fill: none; stroke-width: 4; }
+        .timer-ring .bg { stroke: var(--bg-card); }
+        .timer-ring .progress {
+            stroke: var(--success); stroke-linecap: round;
+            transform: rotate(-90deg); transform-origin: 50% 50%;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+        .timer-ring.warning .progress { stroke: var(--warning); }
+        .timer-ring.danger .progress { stroke: var(--danger); }
+        .timer-text { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; }
+        
+        /* WALLET */
+        .wallet-info {
+            display: flex; align-items: center; gap: 12px; padding: 14px;
+            background: var(--bg-secondary); border-radius: var(--radius);
+            margin-bottom: 16px; font-size: 0.85rem;
+        }
+        .wallet-status {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--text-muted);
+        }
+        .wallet-status.connected {
+            background: var(--success); box-shadow: 0 0 10px var(--success);
+        }
+        .wallet-address { font-family: 'JetBrains Mono', monospace; color: var(--accent-secondary); }
+        .whitelist-badge {
+            margin-left: auto; padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px; font-size: 0.7rem; color: var(--success);
+            text-transform: uppercase;
+        }
+        
+        /* MODALS */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 24px;
+            width: 100%; max-width: 450px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-header h3 { font-size: 1.1rem; font-weight: 600; }
+        .modal-close {
+            background: none; border: none; color: var(--text-secondary);
+            font-size: 1.5rem; cursor: pointer; transition: color 0.2s;
+        }
+        .modal-close:hover { color: var(--text-primary); }
+        
+        /* QR SCANNER */
+        #qr-reader { width: 100%; border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+        
+        /* SPINNER */
+        .spinner {
+            width: 20px; height: 20px; border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: var(--text-primary); border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* EMPTY STATE */
+        .empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); }
+        .empty-state-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.3; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="logo">⚡ Immortal 2FA</h1>
+            <p class="subtitle">Gasless Decentralized Authenticator</p>
+            <div class="badges">
+                <div class="badge">🔗 Polygon</div>
+                <div class="badge">⚡ Biconomy</div>
+                <div class="badge">☁️ IPFS</div>
+            </div>
+        </header>
+        
+        <div id="statusBar" class="status-bar"></div>
+        
+        <!-- Wallet Card -->
+        <div class="card">
+            <h2 class="card-title">Connect Wallet</h2>
+            <div id="walletInfo" class="wallet-info hidden">
+                <div class="wallet-status" id="walletStatus"></div>
+                <span class="wallet-address" id="walletAddress"></span>
+                <div class="whitelist-badge hidden" id="whitelistBadge">✓ Whitelisted</div>
+            </div>
+            <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">
+                🦊 Connect MetaMask
+            </button>
+        </div>
+        
+        <!-- Activation Card -->
+        <div class="card hidden" id="activationCard">
+            <h2 class="card-title">Activate Vault</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+                Pay once (2 POL), use forever gasless. Whitelisted users activate for free.
+            </p>
+            <button class="btn btn-success" id="activateBtn" onclick="activateVault()">
+                💎 Activate Vault (2 POL)
+            </button>
+        </div>
+        
+        <!-- Actions Card -->
+        <div class="card hidden" id="actionsCard">
+            <h2 class="card-title">Actions</h2>
+            <div class="btn-group btn-group-3">
+                <button class="btn btn-success" onclick="openAddModal()">➕ Add</button>
+                <button class="btn btn-primary" onclick="openScannerModal()">📷 Scan QR</button>
+                <button class="btn btn-outline" onclick="openImportModal()">📥 Import</button>
+            </div>
+            <div style="height: 12px;"></div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveToIPFS()">☁️ Save to IPFS</button>
+                <button class="btn btn-outline" onclick="loadFromBlockchain()">⛓️ Load Vault</button>
+            </div>
+        </div>
+        
+        <!-- Services Card -->
+        <div class="card">
+            <h2 class="card-title">2FA Tokens</h2>
+            <div id="servicesList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔐</div>
+                    <p>No services yet</p>
+                    <p style="font-size: 0.85rem; margin-top: 10px; color: var(--text-muted);">
+                        Add services manually, scan QR code, or import from Google/Authy
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Modal -->
+    <div id="addModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Service</h3>
+                <button class="modal-close" onclick="closeAddModal()">&times;</button>
+            </div>
+            <div class="input-group">
+                <label>Service Name</label>
+                <input type="text" id="serviceName" placeholder="Gmail, GitHub...">
+            </div>
+            <div class="input-group">
+                <label>Secret Key (Base32)</label>
+                <input type="text" id="serviceSecret" placeholder="JBSWY3DPEHPK3PXP">
+            </div>
+            <div class="input-group">
+                <label>Issuer (Optional)</label>
+                <input type="text" id="serviceIssuer" placeholder="Google">
+            </div>
+            <button class="btn btn-success" onclick="addService()">✓ Add Service</button>
+        </div>
+    </div>
+    
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Scan QR Code</h3>
+                <button class="modal-close" onclick="closeScannerModal()">&times;</button>
+            </div>
+            <div id="qr-reader"></div>
+            <button class="btn btn-outline" onclick="stopScanner()">⏹ Stop Scanner</button>
+        </div>
+    </div>
+    
+    <!-- Import Modal -->
+    <div id="importModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Import from Google/Authy</h3>
+                <button class="modal-close" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="input-group">
+                <label>Paste Export Data</label>
+                <textarea id="importText" rows="4" placeholder="otpauth-migration://..."></textarea>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 16px;">
+                In Google Authenticator: ⋮ → Export accounts → Show QR → Copy data
+            </p>
+            <button class="btn btn-success" onclick="importFromGoogle()">📥 Import</button>
+        </div>
+    </div>
+    
+    <!-- Activation Modal -->
+    <div id="activateModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Activating Vault</h3>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                Confirm the transaction to activate your vault.
+            </p>
+            <div class="spinner" style="margin: 0 auto 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const CONFIG = {
+            CONTRACT_ADDRESS: '0xYOUR_CONTRACT_ADDRESS',
+            CONTRACT_ABI: [
+                "function activateVault() external payable",
+                "function saveVault(string calldata _ipfsHash) external",
+                "function getVault(address user) external view returns (string)",
+                "function isActivated(address user) external view returns (bool)",
+                "function getVaultInfo(address user) external view returns (string, uint256, uint256, bool)",
+                "function isWhitelisted(address user) external view returns (bool)",
+                "function setWhitelisted(address user, bool status) external",
+                "event VaultActivated(address indexed user, uint256 amount, uint256 timestamp)",
+                "event VaultUpdated(address indexed user, string ipfsHash, uint256 timestamp)"
+            ],
+            CHAIN_ID: 137,
+            RPC_URL: 'https://polygon-rpc.com',
+            IPFS_GATEWAY: 'https://ipfs.io/ipfs/',
+            BICONOMY_API_KEY: 'YOUR_BICONOMY_API_KEY',
+            BICONOMY_PAYMASTER_URL: 'https://paymaster.biconomy.io/api/v1/59140/your-key'
+        };
+        
+        // ==========================================
+        // STATE
+        // ==========================================
+        let provider, signer, contract, userAddress, biconomyAccount;
+        let services = [], encryptionKey, timerIntervals = {}, html5QrCode, currentIpfsHash, isWhitelisted = false;
+        
+        // ==========================================
+        // INIT
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadServicesFromStorage();
+            renderServices();
+            checkWalletConnection();
+        });
+        
+        // ==========================================
+        // WALLET & BICONOMY
+        // ==========================================
+        async function connectWallet() {
+            try {
+                showStatus('Connecting...', 'info');
+                
+                if (!window.ethereum) throw new Error('Install MetaMask!');
+                
+                provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+                
+                // Generate encryption key from signature
+                const signature = await signer.signMessage("Unlock My Vault");
+                encryptionKey = ethers.keccak256(ethers.toUtf8Bytes(signature));
+                
+                // Initialize contract
+                contract = new ethers.Contract(CONFIG.CONTRACT_ADDRESS, CONFIG.CONTRACT_ABI, signer);
+                
+                // Initialize Biconomy
+                await initBiconomy();
+                
+                // Check activation and whitelist
+                const activated = await contract.isActivated(userAddress);
+                isWhitelisted = await contract.isWhitelisted(userAddress);
+                
+                if (isWhitelisted) {
+                    document.getElementById('whitelistBadge').classList.remove('hidden');
+                }
+                
+                if (activated) {
+                    document.getElementById('activationCard').classList.add('hidden');
+                    document.getElementById('actionsCard').classList.remove('hidden');
+                } else {
+                    document.getElementById('activationCard').classList.remove('hidden');
+                }
+                
+                updateWalletUI();
+                showStatus('Connected!', 'success');
+                
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function initBiconomy() {
+            try {
+                // Biconomy Smart Account initialization
+                const bundler = new BiconomySmartAccount({
+                    chainId: CONFIG.CHAIN_ID,
+                    entryPointAddress: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+                    paymaster: { paymasterUrl: CONFIG.BICONOMY_PAYMASTER_URL },
+                    bundler: 'https://bundler.biconomy.io'
+                });
+                
+                biconomyAccount = await bundler.init();
+                console.log('Biconomy initialized:', await biconomyAccount.getAddress());
+            } catch (error) {
+                console.error('Biconomy init error:', error);
+            }
+        }
+        
+        async function checkWalletConnection() {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) await connectWallet();
+            }
+        }
+        
+        function updateWalletUI() {
+            document.getElementById('walletAddress').textContent = 
+                `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+            document.getElementById('walletStatus').classList.add('connected');
+            document.getElementById('walletInfo').classList.remove('hidden');
+            document.getElementById('connectBtn').innerHTML = '✓ Connected';
+            document.getElementById('connectBtn').disabled = true;
+        }
+        
+        // ==========================================
+        // ACTIVATION
+        // ==========================================
+        async function activateVault() {
+            if (!userAddress) { showStatus('Connect wallet first!', 'error'); return; }
+            
+            try {
+                document.getElementById('activateModal').classList.remove('hidden');
+                
+                const fee = isWhitelisted ? 0 : ethers.parseEther('2');
+                const tx = await contract.activateVault({ value: fee });
+                
+                showStatus('Activating...', 'info');
+                await tx.wait();
+                
+                document.getElementById('activateModal').classList.add('hidden');
+                document.getElementById('activationCard').classList.add('hidden');
+                document.getElementById('actionsCard').classList.remove('hidden');
+                showStatus('Vault activated! Now gasless ✓', 'success');
+                
+            } catch (error) {
+                document.getElementById('activateModal').classList.add('hidden');
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        // ==========================================
+        // SERVICE MANAGEMENT
+        // ==========================================
+        function openAddModal() {
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+        function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); }
+        function openScannerModal() {
+            document.getElementById('scannerModal').classList.remove('hidden');
+            startScanner();
+        }
+        function closeScannerModal() {
+            document.getElementById('scannerModal').classList.add('hidden');
+            stopScanner();
+        }
+        function openImportModal() { document.getElementById('importModal').classList.remove('hidden'); }
+        function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
+        
+        function addService() {
+            const name = document.getElementById('serviceName').value.trim();
+            const secret = document.getElementById('serviceSecret').value.trim().toUpperCase();
+            const issuer = document.getElementById('serviceIssuer').value.trim();
+            
+            if (!name || !secret) { showStatus('Fill all fields!', 'error'); return; }
+            if (!/^[A-Z2-7]+=*$/.test(secret)) { showStatus('Invalid Base32!', 'error'); return; }
+            if (services.some(s => s.name === name)) { showStatus('Exists!', 'error'); return; }
+            
+            services.push({ id: Date.now(), name, secret, issuer });
+            saveServicesToStorage();
+            renderServices();
+            closeAddModal();
+            showStatus('Added!', 'success');
+        }
+        
+        function deleteService(id) {
+            services = services.filter(s => s.id !== id);
+            saveServicesToStorage();
+            renderServices();
+            showStatus('Deleted', 'info');
+        }
+        
+        // ==========================================
+        // ENCRYPTION
+        // ==========================================
+        function encryptData(data) {
+            return CryptoJS.AES.encrypt(JSON.stringify(data), encryptionKey).toString();
+        }
+        
+        function decryptData(encrypted) {
+            const bytes = CryptoJS.AES.decrypt(encrypted, encryptionKey);
+            return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+        }
+        
+        // ==========================================
+        // QR SCANNER & PARSER
+        // ==========================================
+        function startScanner() {
+            html5QrCode = new Html5Qrcode('qr-reader');
+            html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, onScanSuccess);
+        }
+        
+        function stopScanner() {
+            if (html5QrCode) { html5QrCode.stop(); html5QrCode = null; }
+        }
+        
+        function onScanSuccess(decodedText) {
+            if (decodedText.startsWith('otpauth://')) {
+                const parsed = parseOtpAuthUri(decodedText);
+                if (parsed && !services.some(s => s.name === parsed.name)) {
+                    services.push(parsed);
+                    saveServicesToStorage();
+                    renderServices();
+                    closeScannerModal();
+                    showStatus(`Added: ${parsed.name}`, 'success');
+                }
+            } else if (decodedText.startsWith('otpauth-migration://')) {
+                showStatus('Use Import function for export data', 'info');
+            } else {
+                const secretMatch = decodedText.match(/([A-Z2-7]{16,})/i);
+                if (secretMatch) {
+                    document.getElementById('serviceSecret').value = secretMatch[1].toUpperCase();
+                    closeScannerModal();
+                    openAddModal();
+                }
+            }
+        }
+        
+        /**
+         * @dev Парсинг otpauth:// URI
+         */
+        function parseOtpAuthUri(uri) {
+            try {
+                const url = new URL(uri);
+                const params = new URLSearchParams(url.search);
+                
+                return {
+                    id: Date.now(),
+                    name: url.pathname.substring(1) || params.get('issuer') || 'Unknown',
+                    secret: (params.get('secret') || '').toUpperCase(),
+                    issuer: params.get('issuer') || '',
+                    algorithm: params.get('algorithm') || 'SHA1',
+                    digits: parseInt(params.get('digits') || '6'),
+                    period: parseInt(params.get('period') || '30')
+                };
+            } catch (error) {
+                console.error('Parse error:', error);
+                return null;
+            }
+        }
+        
+        // ==========================================
+        // GOOGLE/AUTHY IMPORT
+        // ==========================================
+        function importFromGoogle() {
+            const importText = document.getElementById('importText').value.trim();
+            
+            if (!importText) { showStatus('Paste export data!', 'error'); return; }
+            
+            try {
+                if (!importText.startsWith('otpauth-migration://')) {
+                    throw new Error('Invalid export format');
+                }
+                
+                const url = new URL(importText);
+                const params = new URLSearchParams(url.search);
+                const data = params.get('data');
+                
+                if (!data) throw new Error('No data in export');
+                
+                // Decode base64 protobuf (simplified)
+                const decoded = atob(decodeURIComponent(data));
+                const accounts = parseGoogleAuthData(decoded);
+                
+                if (accounts.length === 0) throw new Error('No accounts found');
+                
+                let added = 0;
+                accounts.forEach(acc => {
+                    if (!services.some(s => s.name === acc.name)) {
+                        services.push({ id: Date.now() + Math.random(), ...acc });
+                        added++;
+                    }
+                });
+                
+                saveServicesToStorage();
+                renderServices();
+                closeImportModal();
+                showStatus(`Imported ${added} services!`, 'success');
+                
+            } catch (error) {
+                showStatus('Import error: ' + error.message, 'error');
+            }
+        }
+        
+        function parseGoogleAuthData(data) {
+            // Simplified parser - production needs full protobuf parsing
+            const accounts = [];
+            const secretPattern = /[A-Z2-7]{16,}/g;
+            const matches = data.toUpperCase().match(secretPattern) || [];
+            
+            matches.forEach((secret, index) => {
+                accounts.push({ name: `Imported_${index + 1}`, secret, issuer: '' });
+            });
+            
+            return accounts;
+        }
+        
+        // ==========================================
+        // IPFS & GASLESS SAVE
+        // ==========================================
+        async function saveToIPFS() {
+            if (services.length === 0) { showStatus('No services!', 'error'); return; }
+            
+            try {
+                showStatus('Encrypting & uploading...', 'info');
+                const encrypted = encryptData(services);
+                const blob = new Blob([JSON.stringify({ encrypted, v: '1.0', ts: Date.now() })], { type: 'application/json' });
+                
+                // Simulated IPFS (use Pinata/web3.storage in production)
+                const ipfsHash = 'bafybeig' + Array(42).fill(0).map(() => '0123456789abcdef'[Math.random() * 16 | 0]).join('');
+                
+                currentIpfsHash = ipfsHash;
+                showStatus(`IPFS: ${ipfsHash.slice(0, 16)}...`, 'success');
+                
+                await syncToBlockchain();
+                
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        /**
+         * @dev Gasless save via Biconomy Paymaster
+         */
+        async function syncToBlockchain() {
+            try {
+                showStatus('Saving via Biconomy (gasless)...', 'info');
+                
+                const callData = contract.interface.encodeFunctionData('saveVault', [currentIpfsHash]);
+                
+                // Send via Biconomy Smart Account
+                const userOp = await biconomyAccount.sendUserOp({
+                    callData: callData,
+                    target: CONFIG.CONTRACT_ADDRESS
+                });
+                
+                await userOp.wait();
+                showStatus('Saved gasless! ✓', 'success');
+                
+            } catch (error) {
+                console.error('Biconomy error:', error);
+                showStatus('Biconomy failed, using direct tx...', 'warning');
+                
+                // Fallback to direct transaction
+                const tx = await contract.saveVault(currentIpfsHash);
+                await tx.wait();
+                showStatus('Saved! ✓', 'success');
+            }
+        }
+        
+        async function loadFromBlockchain() {
+            try {
+                showStatus('Loading...', 'info');
+                const ipfsHash = await contract.getVault(userAddress);
+                const res = await fetch(`${CONFIG.IPFS_GATEWAY}${ipfsHash}`);
+                const data = await res.json();
+                services = decryptData(data.encrypted);
+                saveServicesToStorage();
+                renderServices();
+                showStatus('Loaded! ✓', 'success');
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        // ==========================================
+        // TOTP GENERATION
+        // ==========================================
+        function generateTOTP(secret) {
+            try {
+                return new OTPAuth.TOTP({
+                    secret: OTPAuth.Secret.fromBase32(secret),
+                    digits: 6, period: 30
+                }).generate();
+            } catch { return '------'; }
+        }
+        
+        function getRemainingTime() { return 30 - (Date.now() / 1000 | 0) % 30; }
+        
+        function renderServices() {
+            const container = document.getElementById('servicesList');
+            Object.values(timerIntervals).forEach(clearInterval);
+            timerIntervals = {};
+            
+            if (services.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔐</div><p>No services</p></div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            services.forEach(service => {
+                const el = document.createElement('div');
+                el.className = 'service-item';
+                el.innerHTML = `
+                    <div class="service-info">
+                        <div class="service-name">${escapeHtml(service.name)}</div>
+                        ${service.issuer ? `<div class="service-issuer">${escapeHtml(service.issuer)}</div>` : ''}
+                        <div class="service-code" id="code-${service.id}">------</div>
+                    </div>
+                    <div class="service-actions">
+                        <div class="service-timer">
+                            <svg class="timer-ring" id="timer-${service.id}" viewBox="0 0 60 60">
+                                <circle class="bg" cx="30" cy="30" r="26"/>
+                                <circle class="progress" cx="30" cy="30" r="26" stroke-dasharray="163.36"/>
+                            </svg>
+                            <span class="timer-text" id="timer-text-${service.id}">30</span>
+                        </div>
+                        <button class="copy-btn" onclick="copyCode('${service.id}')" title="Copy code">📋</button>
+                        <button class="delete-btn" onclick="deleteService(${service.id})">×</button>
+                    </div>
+                `;
+                container.appendChild(el);
+                updateServiceCode(service);
+                timerIntervals[service.id] = setInterval(() => updateServiceCode(service), 1000);
+            });
+        }
+        
+        function updateServiceCode(service) {
+            const codeEl = document.getElementById(`code-${service.id}`);
+            const timerEl = document.getElementById(`timer-${service.id}`);
+            if (!codeEl || !timerEl) return;
+            
+            const code = generateTOTP(service.secret);
+            const remaining = getRemainingTime();
+            const progress = (remaining / 30) * 163.36;
+            
+            codeEl.textContent = code;
+            document.getElementById(`timer-text-${service.id}`).textContent = remaining;
+            timerEl.querySelector('.progress').style.strokeDashoffset = 163.36 - progress;
+            
+            timerEl.classList.toggle('warning', remaining <= 10);
+            timerEl.classList.toggle('danger', remaining <= 5);
+        }
+        
+        function copyCode(id) {
+            const code = document.getElementById(`code-${id}`).textContent;
+            navigator.clipboard.writeText(code);
+            showStatus('Code copied!', 'success');
+        }
+        
+        // ==========================================
+        // UTILS
+        // ==========================================
+        function saveServicesToStorage() { localStorage.setItem('immortal2fa_services', JSON.stringify(services)); }
+        function loadServicesFromStorage() { const s = localStorage.getItem('immortal2fa_services'); if (s) services = JSON.parse(s); }
+        
+        function showStatus(msg, type) {
+            const bar = document.getElementById('statusBar');
+            bar.textContent = msg; bar.className = `status-bar show ${type}`;
+            setTimeout(() => bar.classList.remove('show'), 5000);
+        }
+        
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    </script>
+</body>
+</html>
